@@ -78,7 +78,7 @@ if 'la_agent' not in st.session_state:
     st.session_state.la_agent = None
 
 
-image = Image.open('sunrise.png')
+image = Image.open('header_img.png')
 st.image(image, caption='')
 
 st.title("Visualising As-The-Crow-Flies Navigation")
