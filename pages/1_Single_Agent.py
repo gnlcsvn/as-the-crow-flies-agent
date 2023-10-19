@@ -161,7 +161,7 @@ if 'stats' not in st.session_state:
 
 
 image = Image.open('header_img.png')
-st.image(image, caption='Created with DALL·E 3')
+st.image(image, caption='Created with DALLE 3')
 
 st.title("Visualising As-The-Crow-Flies Navigation")
 
