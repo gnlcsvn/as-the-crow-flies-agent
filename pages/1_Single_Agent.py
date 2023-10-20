@@ -9,6 +9,21 @@ from la_agent import LeastAngleAgent
 from PIL import Image
 import networkx as nx
 
+def interpolate_offset(dist, dist_min=500, dist_max=2000, offset_min=0.0005, offset_max=0.002):
+    """
+    Linearly interpolate the offset value based on the given distance.
+    
+    Parameters:
+    - dist (int): The current distance value.
+    - dist_min (int): The minimum value of the distance range.
+    - dist_max (int): The maximum value of the distance range.
+    - offset_min (float): The desired offset when dist is at its minimum.
+    - offset_max (float): The desired offset when dist is at its maximum.
+    
+    Returns:
+    - float: The interpolated offset value.
+    """
+    return offset_min + (dist - dist_min) * (offset_max - offset_min) / (dist_max - dist_min)
 
 def get_graph_stats(G):
     """
@@ -101,6 +116,8 @@ def get_graph(city, dist):
         get_graph_stats(G)
         return G, ax
 
+import matplotlib.pyplot as plt
+
 def create_random_route(plot_spot, G):
     """
     Creates a random route in the city graph and visualizes it.
@@ -121,20 +138,38 @@ def create_random_route(plot_spot, G):
     start_node, target_node = np.random.choice(G.nodes, 2)
     route1, _ = st.session_state.la_agent.find_path(start_node, target_node)
     
+    # Get the x and y coordinates of the start and end nodes
+    x_start, y_start = G.nodes[start_node]['x'], G.nodes[start_node]['y']
+    x_end, y_end = G.nodes[target_node]['x'], G.nodes[target_node]['y']
+
+    # Load PNG icons for start and end nodes
+    end_icon = plt.imread('marker.png')
+
+    # In your create_random_route function, calculate the offset using:
+    offset = interpolate_offset(st.session_state['dist'])
+
+    # Overlay the icons on the plot with a fixed size
+    ax.imshow(end_icon, extent=(x_end-offset, x_end+offset, y_end-offset, y_end+offset), zorder=3)
+
+    
     if nx.has_path(G, start_node, target_node):
         route2 = nx.shortest_path(G, source=start_node, target=target_node, weight='length')
     else:
         route2 = []
 
     if route1 and route2:
-        ox.plot_graph_route(G, route1, ax=ax, show=False, close=False, route_color='red', route_linewidth=2)
-        ox.plot_graph_route(G, route2, ax=ax, show=False, close=False, route_color='blue', route_linewidth=2)
-        with plot_spot:
-            st.pyplot(fig)
+        try:
+            ox.plot_graph_route(G, route1, ax=ax, show=False, close=False, route_color='red', route_linewidth=2)
+            ox.plot_graph_route(G, route2, ax=ax, show=False, close=False, route_color='blue', route_linewidth=2)
+            with plot_spot:
+                st.pyplot(fig)
+        except:
+            create_random_route(plot_spot, G)
     else:
         create_random_route(plot_spot, G)
+
+
     
-    st.write("Red: As-The-Crow-Flies, Blue: Shortest Path")
 
 # Streamlit UI Initialization
 st.set_page_config(page_title="Single Agent", page_icon="🧭")
@@ -148,6 +183,8 @@ if 'la_agent' not in st.session_state:
     st.session_state.la_agent = None
 if 'stats' not in st.session_state:
     st.session_state['stats'] = None
+if 'stats' not in st.session_state:
+    st.session_state['dist'] = None
 
 image = Image.open('header_img.png')
 st.title("Visualising As-The-Crow-Flies Navigation")
@@ -155,7 +192,7 @@ st.image(image, caption='Created with DALLE 3')
 
 with st.form("my_form"):
     city = st.text_input("Enter a city:", value='Zurich')
-    dist = st.slider('Graph size (meters from city center):', min_value=500, max_value=2000, value=1000, step=100)
+    st.session_state['dist'] = st.slider('Graph size (meters from city center):', min_value=500, max_value=2000, value=1000, step=100)
     submitted = st.form_submit_button("Show City")
 
 button1 = st.empty()
@@ -163,7 +200,8 @@ plot_spot = st.empty()
 
 if submitted:
     with st.spinner('Loading Street Network'):
-        st.session_state['G'], st.session_state['ax'] = get_graph(city, dist)
+        st.session_state['G'], st.session_state['ax'] = get_graph(city, st.session_state['dist'])
+        st.session_state.route_visible = True
         if st.session_state['stats']:
             print_graph_stats()
 
@@ -171,5 +209,6 @@ if st.session_state.route_visible:
     if button1.button('Create Random Route'):
         with st.spinner('Calculating Route'):
             create_random_route(plot_spot, st.session_state.G)
+            st.write("Red: As-The-Crow-Flies, Blue: Shortest Path")
             if st.session_state['stats']:
                 print_graph_stats()
