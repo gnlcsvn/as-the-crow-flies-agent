@@ -1,3 +1,4 @@
+# Importing necessary libraries
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -8,18 +9,20 @@ from la_agent import LeastAngleAgent
 from PIL import Image
 import networkx as nx
 
-st.set_page_config(
-    page_title="Single Agent",
-    page_icon="🧭",
-)
-
 
 def get_graph_stats(G):
+    """
+    Fetches basic statistics of the graph and stores them in the session state.
+
+    Parameters:
+    - G (networkx graph): The graph for which the statistics are to be fetched.
+    """
     st.session_state['stats'] = ox.stats.basic_stats(G)
 
 def print_graph_stats():
-    st.title("City Graph Statistics")
-
+    """
+    Displays the statistics of the city graph using Streamlit's UI components.
+    """
     # General Information
     st.subheader("General Information")
     st.write(f"Number of Nodes (Intersections): {st.session_state['stats']['n']}")
@@ -58,18 +61,28 @@ def print_graph_stats():
     st.write(f"Proportion of Self Loops: {round(st.session_state['stats']['self_loop_proportion'], 4)}")
 
 def get_graph(city, dist):
-    # Get latitude and longitude of the city
+    """
+    Fetches the graph representation of the city using OSMnx.
+
+    Parameters:
+    - city (str): Name of the city.
+    - dist (int): Distance in meters from the city center.
+    
+    Returns:
+    - G (networkx graph): Graph representation of the city.
+    - ax (matplotlib axis): The axis on which the graph is plotted.
+    """
     geolocator = Nominatim(user_agent="geoapi")
     location = geolocator.geocode(city)
     
-    if location is None:
+    if not location:
         st.error("Couldn't find city. Try a different search term.")
         return None, None
 
-    # Retrieve the graph from OSMnx
     point = (location.latitude, location.longitude)
     G = ox.graph_from_point(point, dist=dist, dist_type='bbox', clean_periphery=True, simplify=True, network_type="bike")
-    if G is not None and point is not None:
+    
+    if G:
         st.write(f"Displaying graph for {city} around center point {point}")
         fig, ax = ox.plot_graph(G, 
                                 show=False, 
@@ -79,75 +92,52 @@ def get_graph(city, dist):
                                 node_size=10,
                                 edge_color='black',
                                 edge_linewidth=0.5)
-        
-        #send the plot to it's spot "in the line" 
         with plot_spot:
             st.pyplot(fig)
 
-        color_map = ['white' for i in range(G.number_of_nodes())]
-        size_map = [5 for i in range(G.number_of_nodes())]
-
-        # Create an instance of WayfindingAgent
+        color_map = ['white' for _ in G.nodes]
+        size_map = [5 for _ in G.nodes]
         st.session_state.la_agent = LeastAngleAgent(G, color_map, size_map)
         get_graph_stats(G)
-        return(G, ax)
+        return G, ax
 
 def create_random_route(plot_spot, G):
-    # Reproduce the base graph
-    fig, ax = ox.plot_graph(G, 
-                                show=False, 
-                                close=False, 
-                                bgcolor='white',
-                                node_color='grey',
-                                node_size=10,
-                                edge_color='black',
-                                edge_linewidth=0.5)
+    """
+    Creates a random route in the city graph and visualizes it.
 
-    start_node = np.random.choice(G.nodes)
-    target_node = np.random.choice(G.nodes)
-            
-    # After getting the route
-    route1 = st.session_state.la_agent.find_path(start_node, target_node)
-    route1 = route1[0]
-            
-    # Calculate the shortest path using Dijkstra's algorithm
-    try:
+    Parameters:
+    - plot_spot (streamlit delta generator): The place in the Streamlit UI where the plot should appear.
+    - G (networkx graph): Graph representation of the city.
+    """
+    fig, ax = ox.plot_graph(G, 
+                            show=False, 
+                            close=False, 
+                            bgcolor='white',
+                            node_color='grey',
+                            node_size=10,
+                            edge_color='black',
+                            edge_linewidth=0.5)
+
+    start_node, target_node = np.random.choice(G.nodes, 2)
+    route1, _ = st.session_state.la_agent.find_path(start_node, target_node)
+    
+    if nx.has_path(G, start_node, target_node):
         route2 = nx.shortest_path(G, source=start_node, target=target_node, weight='length')
-    except nx.NetworkXNoPath:
+    else:
         route2 = []
 
-    if route1 and route2:  # ensure both routes are not None or empty
-    # Draw the least-angle route
-        fig, ax = ox.plot_graph_route(G, route1,
-                                      ax=ax, 
-                                      show=False, 
-                                      close=False,
-                                      bgcolor='white',
-                                      node_color='grey',
-                                      node_size=10,
-                                      edge_color='black',
-                                      edge_linewidth=0.5,
-                                      route_color='red',
-                                      route_linewidth=2)
-
-        # Draw the shortest path on the same plot
-        ox.plot_graph_route(G, route2,
-                            ax=ax, 
-                            show=False, 
-                            close=False,
-                            route_color='blue',  # Different color for clarity
-                            route_linewidth=2)
+    if route1 and route2:
+        ox.plot_graph_route(G, route1, ax=ax, show=False, close=False, route_color='red', route_linewidth=2)
+        ox.plot_graph_route(G, route2, ax=ax, show=False, close=False, route_color='blue', route_linewidth=2)
         with plot_spot:
             st.pyplot(fig)
     else:
-        # Repeat until route is found
         create_random_route(plot_spot, G)
     
-    st.write("Red: ATCF, Blue: Shortest Path")
+    st.write("Red: As-The-Crow-Flies, Blue: Shortest Path")
 
-# Streamlit UI
-
-# Initialize session_state variables if they don't exist
+# Streamlit UI Initialization
+st.set_page_config(page_title="Single Agent", page_icon="🧭")
 if 'G' not in st.session_state:
     st.session_state['G'] = None
 if 'ax' not in st.session_state:
@@ -159,20 +149,14 @@ if 'la_agent' not in st.session_state:
 if 'stats' not in st.session_state:
     st.session_state['stats'] = None
 
-
 image = Image.open('header_img.png')
+st.title("Visualising As-The-Crow-Flies Navigation")
 st.image(image, caption='Created with DALLE 3')
 
-st.title("Visualising As-The-Crow-Flies Navigation")
-
 with st.form("my_form"):
-    city = st.text_input("Please enter a city name:")
-    dist = st.slider('Choose the size of the graph', 0, 2000, 500)
-
-    
-    # Every form must have a submit button.
+    city = st.text_input("Enter a city:", value='Zurich')
+    dist = st.slider('Graph size (meters from city center):', min_value=500, max_value=2000, value=1000, step=100)
     submitted = st.form_submit_button("Show City")
-
 
 button1 = st.empty()
 plot_spot = st.empty()
@@ -180,7 +164,6 @@ plot_spot = st.empty()
 if submitted:
     with st.spinner('Loading Street Network'):
         st.session_state['G'], st.session_state['ax'] = get_graph(city, dist)
-        st.session_state.route_visible = True
         if st.session_state['stats']:
             print_graph_stats()
 
@@ -190,4 +173,3 @@ if st.session_state.route_visible:
             create_random_route(plot_spot, st.session_state.G)
             if st.session_state['stats']:
                 print_graph_stats()
-
