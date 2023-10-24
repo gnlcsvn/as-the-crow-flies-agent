@@ -23,7 +23,7 @@ def get_graph(city, dist):
     Returns:
     - G (networkx graph): Graph representation of the city.
     """
-    geolocator = Nominatim(user_agent="geoapi")
+    geolocator = Nominatim(user_agent="as-the-crow-flies-agent.streamlit.app")
     location = geolocator.geocode(city)
 
     # Check if the city was found

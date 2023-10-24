@@ -87,7 +87,7 @@ def get_graph(city, dist):
     - G (networkx graph): Graph representation of the city.
     - ax (matplotlib axis): The axis on which the graph is plotted.
     """
-    geolocator = Nominatim(user_agent="geoapi")
+    geolocator = Nominatim(user_agent="as-the-crow-flies-agent.streamlit.app")
     location = geolocator.geocode(city)
     
     if not location:
