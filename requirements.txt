@@ -28,7 +28,7 @@ MarkupSafe==3.0.2
 matplotlib==3.9.2
 mdurl==0.1.2
 narwhals==1.13.5
-networkx==3.3
+networkx==3.2.1
 numpy==1.26.4
 osmnx==1.9.4
 packaging==24.2
